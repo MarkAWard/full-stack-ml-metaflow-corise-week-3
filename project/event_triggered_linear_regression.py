@@ -68,6 +68,8 @@ class TaxiFarePrediction(FlowSpec):
         # loop through runs of this flow
         for run in Flow(self.__class__.__name__):
             if run.id != current.run_id:
+                if not run.finished:
+                    continue
                 if run.successful:
                     icon = "✅"
                     msg = "OK"
