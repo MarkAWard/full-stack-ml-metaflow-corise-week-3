@@ -19,12 +19,12 @@ class TaxiFarePrediction(FlowSpec):
     data_url = Parameter("data_url", default=URL)
 
     def transform_features(self, df):
-        # TODO:
-        # Try to complete tasks 2 and 3 with this function doing nothing like it currently is.
-        # Understand what is happening.
-        # Revisit task 1 and think about what might go in this function.
-
-        return df
+        mask = (
+            (df.fare_amount > 0)
+            & (df.trip_distance > 0)
+            & (df.trip_distance <= 100)
+        )
+        return df.loc[mask,:].reset_index(drop=True)
 
     @step
     def start(self):
