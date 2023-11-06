@@ -19,12 +19,26 @@ class TaxiFarePrediction(FlowSpec):
     data_url = Parameter("data_url", default=URL)
 
     def transform_features(self, df):
+        import pandas as pd
+
         mask = (
             (df.fare_amount > 0)
             & (df.trip_distance > 0)
             & (df.trip_distance <= 100)
         )
-        return df.loc[mask,:].reset_index(drop=True)
+        columns = ["trip_distance", "hour", "airport_fee", "congestion_surcharge"]
+        dummy_cols = ["VendorID", "RatecodeID"]
+        fill_values = {
+            "airport_fee": 0.0,
+            "congestion_surcharge": 0.0,
+        }
+        label = ["total_amount"]
+        return pd.get_dummies(
+            df.loc[mask, columns + dummy_cols + label].reset_index(drop=True).fillna(fill_values),
+            columns=dummy_cols,
+            drop_first=True,
+            dummy_na=True,
+        )
 
     @step
     def start(self):
@@ -32,11 +46,7 @@ class TaxiFarePrediction(FlowSpec):
         from sklearn.model_selection import train_test_split
 
         self.df = self.transform_features(pd.read_parquet(self.data_url))
-
-        # NOTE: we are split into training and validation set in the validation step which uses cross_val_score.
-        # This is a simple/naive way to do this, and is meant to keep this example simple, to focus learning on deploying Metaflow flows.
-        # In practice, you want split time series data in more sophisticated ways and run backtests.
-        self.X = self.df["trip_distance"].values.reshape(-1, 1)
+        self.X = self.df.drop(columns="total_amount").values
         self.y = self.df["total_amount"].values
         self.next(self.linear_model)
 
@@ -44,9 +54,10 @@ class TaxiFarePrediction(FlowSpec):
     def linear_model(self):
         "Fit a single variable, linear model to the data."
         from sklearn.linear_model import LinearRegression
+        from sklearn.ensemble import RandomForestRegressor
 
-        # TODO: Play around with the model if you are feeling it.
         self.model = LinearRegression()
+        # self.model = RandomForestRegressor()
 
         self.next(self.validate)
 
@@ -107,6 +118,7 @@ class TaxiFarePrediction(FlowSpec):
     @step
     def end(self):
         print("Success!")
+        print(f"Scores mean: {self.scores.mean()}")
 
 
 if __name__ == "__main__":
